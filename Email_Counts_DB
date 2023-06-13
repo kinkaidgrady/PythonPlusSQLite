@@ -1,0 +1,43 @@
+import sqlite3
+
+#create connection and cursor
+conn = sqlite3.connect('emaildb.sqlite')
+cur = conn.cursor()
+
+#drop existing table ifg necessary 
+cur.execute('DROP TABLE IF EXISTS Counts')
+
+#creates table to get started
+cur.execute('''
+CREATE TABLE Counts (org TEXT, count INTEGER)''')
+
+#user input for file name or auto select a desired file , establishes handle
+fname = input('Enter file name: ')
+if (len(fname) < 1): fname = 'mbox.txt'
+fh = open(fname)
+#create loop to find desired info in file - in this case domain names from email addresses, updates the table, and starts counting how many times the domain name appears 
+for line in fh:
+    if not line.startswith('From: '): continue
+    pieces = line.split()
+    email = pieces[1]
+    doms = email.split('@')
+    dom = doms[1]
+    cur.execute('SELECT count FROM Counts WHERE org = ? ', (dom,))
+    row = cur.fetchone()
+    if row is None:
+        cur.execute('''INSERT INTO Counts (org, count)
+                VALUES (?, 1)''', (dom,))
+    else:
+        cur.execute('UPDATE Counts SET count = count + 1 WHERE org = ?',
+                    (dom,))
+    conn.commit()
+
+#orders the top 10 counts in descending order
+sqlstr = 'SELECT org, count FROM Counts ORDER BY count DESC LIMIT 10'
+
+#prints top 10 domains seen
+for row in cur.execute(sqlstr):
+    print(str(row[0]), row[1])
+
+#closes connection
+cur.close()
